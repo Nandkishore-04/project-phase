@@ -1,0 +1,229 @@
+// Simplified Prisma Schema for SQLite (No external DB installation needed!)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// Core Models
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  name         String
+  role         String   @default("STAFF") // ADMIN, MANAGER, STAFF
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  chatSessions    ChatSession[]
+  purchaseBills   PurchaseBill[]
+  purchaseOrders  PurchaseOrder[]
+
+  @@map("users")
+}
+
+model Supplier {
+  id          String   @id @default(cuid())
+  name        String
+  gstin       String?  @unique
+  email       String?
+  phone       String?
+  address     String?
+  city        String?
+  state       String?
+  stateCode   String?  @map("state_code")
+  pincode     String?
+  rating      Float?   @default(0)
+  activeStatus Int     @default(1) @map("active_status") // 1=active, 0=inactive
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  products       Product[]
+  purchaseBills  PurchaseBill[]
+  purchaseOrders PurchaseOrder[]
+
+  @@map("suppliers")
+}
+
+model Product {
+  id           String   @id @default(cuid())
+  name         String
+  description  String?
+  category     String?
+  hsnCode      String?  @map("hsn_code")
+  gstRate      Float    @default(18) @map("gst_rate")
+  currentStock Int      @default(0) @map("current_stock")
+  reorderLevel Int      @default(10) @map("reorder_level")
+  unitPrice    Float    @map("unit_price")
+  supplierId   String?  @map("supplier_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  supplier              Supplier?              @relation(fields: [supplierId], references: [id])
+  billLineItems         BillLineItem[]
+  poLineItems           POLineItem[]
+  inventoryTransactions InventoryTransaction[]
+  stockAlerts           StockAlert[]
+
+  @@index([supplierId])
+  @@index([category])
+  @@index([name])
+  @@map("products")
+}
+
+model PurchaseBill {
+  id            String   @id @default(cuid())
+  invoiceNumber String   @unique @map("invoice_number")
+  invoiceDate   DateTime @map("invoice_date")
+  supplierId    String   @map("supplier_id")
+  subtotal      Float
+  cgstAmount    Float    @default(0) @map("cgst_amount")
+  sgstAmount    Float    @default(0) @map("sgst_amount")
+  igstAmount    Float    @default(0) @map("igst_amount")
+  totalAmount   Float    @map("total_amount")
+  status        String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  filePath      String?  @map("file_path")
+  uploadedBy    String   @map("uploaded_by")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  supplier      Supplier       @relation(fields: [supplierId], references: [id])
+  uploader      User           @relation(fields: [uploadedBy], references: [id])
+  lineItems     BillLineItem[]
+  transactions  InventoryTransaction[]
+
+  @@index([supplierId])
+  @@index([invoiceDate])
+  @@index([status])
+  @@map("purchase_bills")
+}
+
+model BillLineItem {
+  id              String  @id @default(cuid())
+  billId          String  @map("bill_id")
+  productId       String? @map("product_id")
+  itemName        String  @map("item_name")
+  hsnCode         String? @map("hsn_code")
+  quantity        Int
+  unitPrice       Float   @map("unit_price")
+  gstRate         Float   @map("gst_rate")
+  gstAmount       Float   @map("gst_amount")
+  lineTotal       Float   @map("line_total")
+  confidenceScore Float?  @default(100) @map("confidence_score")
+
+  bill    PurchaseBill @relation(fields: [billId], references: [id], onDelete: Cascade)
+  product Product?     @relation(fields: [productId], references: [id])
+
+  @@index([billId])
+  @@index([productId])
+  @@map("bill_line_items")
+}
+
+model PurchaseOrder {
+  id               String   @id @default(cuid())
+  poNumber         String   @unique @map("po_number")
+  supplierId       String   @map("supplier_id")
+  orderDate        DateTime @default(now()) @map("order_date")
+  expectedDelivery DateTime? @map("expected_delivery")
+  status           String   @default("DRAFT") // DRAFT, PENDING, APPROVED, RECEIVED, CANCELLED
+  totalAmount      Float    @map("total_amount")
+  createdBy        String   @map("created_by")
+  notes            String?
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  supplier  Supplier     @relation(fields: [supplierId], references: [id])
+  creator   User         @relation(fields: [createdBy], references: [id])
+  lineItems POLineItem[]
+
+  @@index([supplierId])
+  @@index([status])
+  @@map("purchase_orders")
+}
+
+model POLineItem {
+  id        String @id @default(cuid())
+  poId      String @map("po_id")
+  productId String @map("product_id")
+  quantity  Int
+  unitPrice Float  @map("unit_price")
+  total     Float
+
+  po      PurchaseOrder @relation(fields: [poId], references: [id], onDelete: Cascade)
+  product Product       @relation(fields: [productId], references: [id])
+
+  @@index([poId])
+  @@index([productId])
+  @@map("po_line_items")
+}
+
+model ChatSession {
+  id           String   @id @default(cuid())
+  userId       String   @map("user_id")
+  title        String   @default("New Conversation")
+  contextData  String?  @map("context_data") // JSON as string for SQLite
+  lastActivity DateTime @default(now()) @map("last_activity")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user     User          @relation(fields: [userId], references: [id])
+  messages ChatMessage[]
+
+  @@index([userId])
+  @@index([lastActivity])
+  @@map("chat_sessions")
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  sessionId String   @map("session_id")
+  sender    String   // USER or AI
+  content   String
+  metadata  String?  // JSON as string for SQLite
+  timestamp DateTime @default(now())
+
+  session ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([timestamp])
+  @@map("chat_messages")
+}
+
+model InventoryTransaction {
+  id              String   @id @default(cuid())
+  productId       String   @map("product_id")
+  transactionType String   @map("transaction_type") // PURCHASE, SALE, ADJUSTMENT, RETURN
+  quantity        Int
+  referenceType   String   @map("reference_type") // PURCHASE_BILL, PURCHASE_ORDER, MANUAL
+  referenceId     String?  @map("reference_id")
+  notes           String?
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  product      Product       @relation(fields: [productId], references: [id])
+  purchaseBill PurchaseBill? @relation(fields: [referenceId], references: [id])
+
+  @@index([productId])
+  @@index([transactionType])
+  @@index([createdAt])
+  @@map("inventory_transactions")
+}
+
+model StockAlert {
+  id            String    @id @default(cuid())
+  productId     String    @map("product_id")
+  alertType     String    @map("alert_type") // LOW_STOCK, OUT_OF_STOCK, EXPIRY, PRICE_CHANGE
+  threshold     Int
+  isActive      Int       @default(1) @map("is_active") // 1=active, 0=inactive
+  lastTriggered DateTime? @map("last_triggered")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([productId])
+  @@index([isActive])
+  @@map("stock_alerts")
+}
