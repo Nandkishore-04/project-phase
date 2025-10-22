@@ -188,6 +188,26 @@ class ApiService {
     });
     return response.data;
   }
+
+  // Invoice endpoints
+  async uploadInvoice(formData: FormData) {
+    const response = await this.client.post('/invoices/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  }
+
+  async getInvoices(params?: { limit?: number; offset?: number; status?: string }) {
+    const response = await this.client.get('/invoices', { params });
+    return response.data;
+  }
+
+  async getInvoice(id: string) {
+    const response = await this.client.get(`/invoices/${id}`);
+    return response.data;
+  }
 }
 
 export default new ApiService();

@@ -10,6 +10,14 @@ yarn-error.log*
 .env.production
 .env.development
 
+# Google Cloud Credentials (NEVER COMMIT!)
+*.json
+!package.json
+!package-lock.json
+!tsconfig.json
+!jsconfig.json
+inventory-*.json
+
 # Build outputs
 dist/
 build/

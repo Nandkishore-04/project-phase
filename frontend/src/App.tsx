@@ -11,6 +11,7 @@ import Products from './pages/Products';
 import Suppliers from './pages/Suppliers';
 import Chat from './pages/Chat';
 import Analytics from './pages/Analytics';
+import Invoices from './pages/Invoices';
 
 // Components
 import ProtectedRoute from './components/ProtectedRoute';
@@ -91,10 +92,7 @@ function App() {
           element={
             <ProtectedRoute>
               <Layout>
-                <div className="text-center py-12">
-                  <h1 className="text-2xl font-bold">Invoices</h1>
-                  <p className="text-gray-600 mt-2">Coming soon in Phase 4</p>
-                </div>
+                <Invoices />
               </Layout>
             </ProtectedRoute>
           }

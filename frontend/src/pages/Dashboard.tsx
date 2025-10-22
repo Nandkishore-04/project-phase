@@ -179,7 +179,7 @@ export default function Dashboard() {
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Link to="/products/new" className="card p-6 hover:shadow-md transition-shadow">
+        <Link to="/products" className="card p-6 hover:shadow-md transition-shadow cursor-pointer">
           <Package className="text-primary-600 mb-3" size={32} />
           <h3 className="font-bold text-lg mb-2 text-gray-900 dark:text-white">
             Add Product
@@ -189,7 +189,7 @@ export default function Dashboard() {
           </p>
         </Link>
 
-        <Link to="/chat" className="card p-6 hover:shadow-md transition-shadow">
+        <Link to="/chat" className="card p-6 hover:shadow-md transition-shadow cursor-pointer">
           <Package className="text-purple-600 mb-3" size={32} />
           <h3 className="font-bold text-lg mb-2 text-gray-900 dark:text-white">
             AI Assistant
@@ -199,7 +199,7 @@ export default function Dashboard() {
           </p>
         </Link>
 
-        <Link to="/invoices/upload" className="card p-6 hover:shadow-md transition-shadow">
+        <Link to="/invoices" className="card p-6 hover:shadow-md transition-shadow cursor-pointer">
           <Package className="text-green-600 mb-3" size={32} />
           <h3 className="font-bold text-lg mb-2 text-gray-900 dark:text-white">
             Upload Invoice

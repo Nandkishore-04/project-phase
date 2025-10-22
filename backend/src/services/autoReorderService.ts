@@ -142,16 +142,24 @@ export async function runAutoReorderCheck(userId: string = 'system'): Promise<Au
   try {
     logger.info('Running auto-reorder check...');
 
-    const products = await prisma.product.findMany({
+    // Fetch all products and filter by metadata in code (SQLite limitation)
+    const allProducts = await prisma.product.findMany({
       where: {
-        metadata: {
-          path: ['autoReorderRule', 'enabled'],
-          equals: true,
-        },
+        metadata: { not: null },
       },
       include: {
         supplier: true,
       },
+    });
+
+    // Filter products with auto-reorder enabled
+    const products = allProducts.filter(p => {
+      try {
+        const metadata = p.metadata ? JSON.parse(p.metadata) : null;
+        return metadata?.autoReorderRule?.enabled === true;
+      } catch {
+        return false;
+      }
     });
 
     const results: AutoReorderResult[] = [];

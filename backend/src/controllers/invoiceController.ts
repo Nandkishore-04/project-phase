@@ -249,7 +249,7 @@ export const createPurchaseBill = async (
       );
     }
 
-    successResponse(res, purchaseBill, 201);
+    successResponse(res, purchaseBill, 'Purchase bill created successfully', 201);
   } catch (error) {
     logger.error('Error creating purchase bill:', error);
     next(error);

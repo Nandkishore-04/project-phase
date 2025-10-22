@@ -4,6 +4,7 @@ import api from '../services/api';
 import { Product } from '../types';
 import toast from 'react-hot-toast';
 import ForecastModal from '../components/analytics/ForecastModal';
+import AddProductModal from '../components/AddProductModal';
 
 export default function Products() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -12,10 +13,13 @@ export default function Products() {
   const [selectedCategory, setSelectedCategory] = useState('');
   const [categories, setCategories] = useState<string[]>([]);
   const [forecastModal, setForecastModal] = useState<{ productId: string; productName: string } | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [suppliers, setSuppliers] = useState<any[]>([]);
 
   useEffect(() => {
     loadProducts();
     loadCategories();
+    loadSuppliers();
   }, []);
 
   const loadProducts = async () => {
@@ -36,6 +40,26 @@ export default function Products() {
       setCategories(response.data || []);
     } catch (error) {
       console.error('Failed to load categories:', error);
+    }
+  };
+
+  const loadSuppliers = async () => {
+    try {
+      const response = await api.getSuppliers();
+      setSuppliers(response.data || []);
+    } catch (error) {
+      console.error('Failed to load suppliers:', error);
+    }
+  };
+
+  const handleAddProduct = async (formData: any) => {
+    try {
+      await api.createProduct(formData);
+      toast.success('Product added successfully');
+      setShowAddModal(false);
+      loadProducts();
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to add product');
     }
   };
 
@@ -76,7 +100,7 @@ export default function Products() {
             Manage your inventory products
           </p>
         </div>
-        <button className="btn btn-primary flex items-center gap-2">
+        <button className="btn btn-primary flex items-center gap-2" onClick={() => setShowAddModal(true)}>
           <Plus size={20} />
           Add Product
         </button>
@@ -212,6 +236,15 @@ export default function Products() {
           productId={forecastModal.productId}
           productName={forecastModal.productName}
           onClose={() => setForecastModal(null)}
+        />
+      )}
+
+      {/* Add Product Modal */}
+      {showAddModal && (
+        <AddProductModal
+          suppliers={suppliers}
+          onClose={() => setShowAddModal(false)}
+          onSubmit={handleAddProduct}
         />
       )}
     </div>

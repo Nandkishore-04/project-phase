@@ -1,14 +1,16 @@
-import OpenAI from 'openai';
+// import OpenAI from 'openai';
+import { extractInvoiceDataWithGoogleDocAI } from './googleDocumentAIService';
 import fs from 'fs';
 import path from 'path';
 import logger from '../config/logger';
 import { validateGSTINFormat, processInvoiceGST } from '../utils/gstValidation';
+import prisma from '../config/database';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || '',
-});
+// const openai = new OpenAI({
+//   apiKey: process.env.OPENAI_API_KEY || '',
+// });
 
-const isConfigured = !!process.env.OPENAI_API_KEY;
+const isConfigured = !!process.env.GOOGLE_APPLICATION_CREDENTIALS;
 
 export interface ExtractedInvoiceData {
   invoiceNumber: string;
@@ -57,109 +59,49 @@ export interface CorrectionSuggestion {
 }
 
 /**
- * Extract invoice data using GPT-4 Vision (OpenAI)
+ * Extract invoice data using Google Document AI
  */
 export async function extractInvoiceDataWithAI(
-  imagePath: string
+  filePath: string
 ): Promise<ExtractedInvoiceData> {
   if (!isConfigured) {
-    throw new Error('OpenAI API is not configured. Please add OPENAI_API_KEY to .env file.');
+    throw new Error('Google Document AI is not configured. Please add GOOGLE_APPLICATION_CREDENTIALS to .env file.');
   }
-
   try {
-    // Read the image file
-    const imageBuffer = fs.readFileSync(imagePath);
-    const base64Image = imageBuffer.toString('base64');
-    const mimeType = getMimeType(imagePath);
-
-    logger.info('Processing invoice with GPT-4 Vision', { imagePath });
-
-    // Call GPT-4 Vision
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4-vision-preview',
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: `Analyze this invoice/bill image and extract the following information in JSON format:
-
-{
-  "invoiceNumber": "invoice/bill number",
-  "invoiceDate": "date in YYYY-MM-DD format",
-  "supplierName": "vendor/supplier company name",
-  "supplierGSTIN": "15-digit GSTIN if present",
-  "supplierAddress": "full address if available",
-  "subtotal": numeric value before tax,
-  "cgst": CGST amount (0 if not applicable),
-  "sgst": SGST amount (0 if not applicable),
-  "igst": IGST amount (0 if not applicable),
-  "totalAmount": final total amount,
-  "items": [
-    {
-      "name": "item description",
-      "hsnCode": "HSN/SAC code if present",
-      "quantity": numeric quantity,
-      "unitPrice": price per unit,
-      "gstRate": GST percentage (e.g., 18 for 18%),
-      "amount": line total
+    logger.info('Processing invoice with Google Document AI', { filePath });
+    // result is an object with keys from entity.type (lowercase)
+    // fallback: try to extract known fields
+    const getField = (obj: any, key: string) => {
+      return obj[key] || obj[key.toLowerCase()] || obj[key.toUpperCase()] || '';
+    };
+    const result = await extractInvoiceDataWithGoogleDocAI(filePath);
+    // Fallback for items extraction
+    let items: any[] = [];
+    const r: any = result;
+    if (Array.isArray(r.items)) {
+      items = r.items;
+    } else if (Array.isArray(r.lineitems)) {
+      items = r.lineitems;
+    } else if (Array.isArray(r.entities)) {
+      items = r.entities.filter((e: any) => e.type && e.type.toLowerCase().includes('item'));
     }
-  ]
-}
-
-Important:
-- Extract all numeric values as numbers, not strings
-- Use null for missing data
-- For dates, convert to YYYY-MM-DD format
-- Extract ALL line items from the invoice
-- If CGST and SGST are present, IGST should be 0 and vice versa
-- Calculate subtotal as sum of item amounts before tax
-
-Return ONLY the JSON, no other text.`,
-            },
-            {
-              type: 'image_url',
-              image_url: {
-                url: `data:${mimeType};base64,${base64Image}`,
-              },
-            },
-          ],
-        },
-      ],
-      max_tokens: 2000,
-      temperature: 0.1, // Low temperature for accuracy
-    });
-
-    const extractedText = response.choices[0].message.content || '';
-    logger.info('GPT-4 Vision response received', { length: extractedText.length });
-
-    // Parse JSON response
-    const jsonMatch = extractedText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error('No JSON found in AI response');
-    }
-
-    const invoiceData = JSON.parse(jsonMatch[0]) as ExtractedInvoiceData;
-
-    // Validate GSTIN if present
-    if (invoiceData.supplierGSTIN) {
-      const gstinValidation = validateGSTINFormat(invoiceData.supplierGSTIN);
-      if (!gstinValidation.valid) {
-        logger.warn('Invalid GSTIN detected', {
-          gstin: invoiceData.supplierGSTIN,
-          error: gstinValidation.error,
-        });
-      }
-    }
-
-    // Set confidence score
-    invoiceData.confidence = 85; // GPT-4 Vision typically high confidence
-    invoiceData.rawText = extractedText;
-
-    return invoiceData;
+    return {
+      invoiceNumber: (r as any)['invoiceNumber'] || (r as any)['invoicenumber'] || '',
+      invoiceDate: (r as any)['invoiceDate'] || (r as any)['invoicedate'] || '',
+      supplierName: (r as any)['supplierName'] || (r as any)['suppliername'] || '',
+      supplierGSTIN: (r as any)['supplierGSTIN'] || (r as any)['suppliergstin'] || '',
+      supplierAddress: (r as any)['supplierAddress'] || (r as any)['supplieraddress'] || '',
+      subtotal: Number((r as any)['subtotal']) || 0,
+      cgst: Number((r as any)['cgst']) || 0,
+      sgst: Number((r as any)['sgst']) || 0,
+      igst: Number((r as any)['igst']) || 0,
+      totalAmount: Number((r as any)['totalAmount']) || Number((r as any)['totalamount']) || 0,
+      items,
+      confidence: 85,
+      rawText: JSON.stringify(result),
+    };
   } catch (error: any) {
-    logger.error('Error extracting invoice data with AI:', error);
+    logger.error('Error extracting invoice data with Google Document AI:', error);
     throw new Error(`Failed to extract invoice data: ${error.message}`);
   }
 }

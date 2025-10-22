@@ -286,7 +286,7 @@ export const getSupplierPerformance = async (
         orderCount,
         totalSpent,
         avgOrderValue,
-        performance: supplier.rating >= 4.5 ? 'Excellent' : supplier.rating >= 3.5 ? 'Good' : 'Average',
+        performance: (supplier.rating || 0) >= 4.5 ? 'Excellent' : (supplier.rating || 0) >= 3.5 ? 'Good' : 'Average',
       };
     });
 
